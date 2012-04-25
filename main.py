@@ -15,7 +15,6 @@
 # limitations under the License.
 #
 import webapp2
-import cgi
 import string
 
 form = '''
@@ -104,7 +103,7 @@ app = webapp2.WSGIApplication([('/', MainHandler),
                                ('/unit2/rot13', Unit2HWHandler)], 
                                debug=True)
 
-months = ['January',
+months = ['January', 
           'February',
           'March',
           'April',
@@ -137,4 +136,9 @@ def valid_year(year):
             return year
 
 def escape_html(s):
-    return cgi.escape(s, quote = True)
+    for (i, o) in (("&", "&amp;"),
+                   (">", "&gt;"),
+                   ("<", "&lt;"),
+                   ('"', "&quote;")):
+      s = s.replace(i, o)
+    return s
