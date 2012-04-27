@@ -16,6 +16,11 @@
 #
 import webapp2
 import string
+import re
+
+USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
+PASSWORD_RE = re.compile(r"^.{3,20}$")
+EMAIL_RE = re.compile(r"^[\S]+@[\S]+\.[\S]+$")
 
 form = '''
 <form method="post">
@@ -42,7 +47,6 @@ form = '''
 
 rot13code = '''
 <!DOCTYPE html>
-
 <html>
   <head>
     <title>Unit 2 Rot 13</title>
@@ -53,6 +57,78 @@ rot13code = '''
     <form method="post">
       <textarea name="text" style="height: 100px; width: 400px;">%(input)s</textarea>
       <br>
+      <input type="submit">
+    </form>
+  </body>
+
+</html>
+'''
+
+signupcode = '''
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Sign Up</title>
+    <style type="text/css">
+      .label {text-align: right}
+      .error {color: red}
+    </style>
+
+  </head>
+
+  <body>
+    <h2>Signup</h2>
+    <form method="post">
+      <table>
+        <tr>
+          <td class="label">
+            Username
+          </td>
+          <td>
+            <input type="text" name="username" value="%(username)s">
+          </td>
+          <td class="error">
+            %(username_error)s
+          </td>
+        </tr>
+
+        <tr>
+          <td class="label">
+            Password
+          </td>
+          <td>
+            <input type="password" name="password" value="%(password)s">
+          </td>
+          <td class="error">
+            %(password_error)s
+          </td>
+        </tr>
+
+        <tr>
+          <td class="label">
+            Verify Password
+          </td>
+          <td>
+            <input type="password" name="verify" value="%(verify)s">
+          </td>
+          <td class="error">
+            %(verify_error)s
+          </td>
+        </tr>
+
+        <tr>
+          <td class="label">
+            Email (optional)
+          </td>
+          <td>
+            <input type="text" name="email" value="%(email)s">
+          </td>
+          <td class="error">
+            %(email_error)s
+          </td>
+        </tr>
+      </table>
+
       <input type="submit">
     </form>
   </body>
@@ -89,7 +165,7 @@ class ThanksHandler(webapp2.RequestHandler):
     def get(self):
         self.response.out.write("Thanks! That's a totally valid day!")
 
-class Unit2HWHandler(webapp2.RequestHandler):
+class Unit2Rot13Handler(webapp2.RequestHandler):
     def get(self):
         self.response.out.write(rot13code %{'input': ''})
 
@@ -97,11 +173,61 @@ class Unit2HWHandler(webapp2.RequestHandler):
         translated_text = escape_html(self.request.get('text').encode('rot13'))
         self.response.out.write(rot13code %{'input': translated_text})
 
+class Unit2SignupHandler(webapp2.RequestHandler):
+    def write_form(self, username="", password="", verify="", email="",
+                   username_error="", password_error="", verify_error="", 
+                   email_error=""):
+        self.response.out.write(signupcode %{'username': username,
+                                            'password': password,
+                                            'verify': verify,
+                                            'email': email,
+                                            'username_error': username_error,
+                                            'password_error': password_error,
+                                            'verify_error': verify_error,
+                                            'email_error': email_error})
+
+    def get(self):
+        self.write_form()
+
+    def post(self):
+        user_username = self.request.get('username')
+        user_password = self.request.get('password')
+        user_verify = self.request.get('verify')
+        user_email = self.request.get('email')
+        
+        username_error = check_username(user_username)
+        password_error = check_password(user_password)
+        verify_error = ''
+        if not password_error:
+            verify_error = check_verify(user_verify, user_password)
+        email_error = check_email(user_email)
+
+        if (username_error or password_error or verify_error or email_error):
+            self.write_form(escape_html(user_username), '', '',
+                escape_html(user_email), username_error, password_error, verify_error, 
+                email_error)
+        else:
+            self.redirect('/unit2/welcome?username=%s' % escape_html(user_username))
+
+class WelcomeHandler(webapp2.RequestHandler):
+    def get(self):
+        self.response.out.write("Welcome, %s!" % self.request.get('username'))
+
 
 app = webapp2.WSGIApplication([('/', MainHandler),
                                ('/thanks', ThanksHandler),
-                               ('/unit2/rot13', Unit2HWHandler)], 
+                               ('/unit2/rot13', Unit2Rot13Handler), 
+                               ('/unit2/signup', Unit2SignupHandler),
+                               ('/unit2/welcome', WelcomeHandler)], 
                                debug=True)
+
+def escape_html(s):
+    for (i, o) in (("&", "&amp;"),
+                   (">", "&gt;"),
+                   ("<", "&lt;"),
+                   ('"', "&quote;")):
+      s = s.replace(i, o)
+    return s
 
 months = ['January', 
           'February',
@@ -135,10 +261,33 @@ def valid_year(year):
         if year in range(1900,2021):
             return year
 
-def escape_html(s):
-    for (i, o) in (("&", "&amp;"),
-                   (">", "&gt;"),
-                   ("<", "&lt;"),
-                   ('"', "&quote;")):
-      s = s.replace(i, o)
-    return s
+def check_username(name):
+    error_msg = "That's not a valid username."
+    if not (USER_RE.match(name)):
+        return error_msg
+    else:
+        return ''
+
+def check_password(password):
+    error_msg = "That's not a valid password."
+    if not (PASSWORD_RE.match(password)):
+        return error_msg
+    else:
+        return ''
+
+def check_verify(verify, password):
+    error_msg = "Your passwords didn't match."
+    if verify == password:
+        return ''
+    else:
+        return error_msg
+
+def check_email(email):
+    error_msg = "That's not a valid email."
+    if not email:
+        return '' # Because it's optional
+    else:
+        if not (EMAIL_RE.match(email)):
+            return error_msg
+        else:
+            return ''
