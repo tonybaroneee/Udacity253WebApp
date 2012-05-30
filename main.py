@@ -19,6 +19,7 @@ import string
 import os
 import jinja2
 import helpers
+from webapp2_extras.routes import RedirectRoute
 
 # Declare Jinja directory and environment
 template_dir=os.path.join(os.path.dirname(__file__),'templates')
@@ -146,10 +147,10 @@ class WelcomeHandler(webapp2.RequestHandler):
 #
 # URL routes to specific handlers 
 #
-app = webapp2.WSGIApplication([('/', MainHandler),
-                               ('/birthday', BirthdayHandler),
-                               ('/thanks', ThanksHandler),
-                               ('/rot13', Rot13Handler), 
-                               ('/signup', SignupHandler),
-                               ('/welcome', WelcomeHandler)], 
+app = webapp2.WSGIApplication([RedirectRoute('/', MainHandler, name='home', strict_slash=True),
+                               RedirectRoute('/birthday/', BirthdayHandler, name='birthday', strict_slash=True),
+                               RedirectRoute('/thanks/', ThanksHandler, name='thanks', strict_slash=True),
+                               RedirectRoute('/rot13/', Rot13Handler, name='rot13', strict_slash=True), 
+                               RedirectRoute('/signup/', SignupHandler, name='signup', strict_slash=True),
+                               RedirectRoute('/welcome/', WelcomeHandler, name='welcome', strict_slash=True)], 
                                debug=True)

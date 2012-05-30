@@ -1,6 +1,7 @@
 import os
 import webapp2
 import jinja2
+from webapp2_extras.routes import RedirectRoute
 from google.appengine.ext import db
 
 template_dir=os.path.join(os.path.dirname(__file__),'templates')
@@ -40,5 +41,5 @@ class BlogHome(Handler):
             error="we need both title and art"
             self.render_front(title,art,error)
 
-app = webapp2.WSGIApplication([('/blog', BlogHome)],
+app = webapp2.WSGIApplication([RedirectRoute('/blog/', handler=BlogHome, name='bloghome', strict_slash=True)],
                                debug=True)
