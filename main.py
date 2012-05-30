@@ -18,8 +18,6 @@ import webapp2
 import string
 import os
 import jinja2
-
-import blog
 import helpers
 
 # Declare Jinja directory and environment
@@ -136,7 +134,7 @@ class SignupHandler(Handler):
                 user_email, username_error, password_error, verify_error, 
                 email_error)
         else:
-            self.redirect('/unit2/welcome?username=%s' % user_username)
+            self.redirect('/welcome?username=%s' % user_username)
 
 #
 # Welcome Handler for handling acceptable user signup credentials 
@@ -153,6 +151,5 @@ app = webapp2.WSGIApplication([('/', MainHandler),
                                ('/thanks', ThanksHandler),
                                ('/rot13', Rot13Handler), 
                                ('/signup', SignupHandler),
-                               ('/welcome', WelcomeHandler),
-                               ('/blog', blog.MainPage)], 
+                               ('/welcome', WelcomeHandler)], 
                                debug=True)
