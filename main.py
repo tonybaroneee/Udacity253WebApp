@@ -17,131 +17,38 @@
 import webapp2
 import string
 import re
+import os
+import blog
+import jinja2
+
+template_dir=os.path.join(os.path.dirname(__file__),'templates')
+jinja_env=jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir),autoescape=True)
 
 USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
 PASSWORD_RE = re.compile(r"^.{3,20}$")
 EMAIL_RE = re.compile(r"^[\S]+@[\S]+\.[\S]+$")
 
-form = '''
-<form method="post">
-    What is your birthday?
-    <br>
+class Handler(webapp2.RequestHandler):
+    def write(self,*a,**kw):
+        self.response.out.write(*a,**kw)
 
-    <label> Month
-        <input type="text" name="month" value="%(month)s">
-    </label>
-    
-    <label> Day
-        <input type="text" name="day" value="%(day)s">
-    </label>
-    
-    <label> Year
-        <input type="text" name="year" value="%(year)s">
-    </label>
-    <div style="color: red">%(error)s</div>
-    <br>
-    <br>
-    <input type="submit">
-</form>
-'''
+    def render(self,template,**kw):
+         self.write(self.render_str(template,**kw))
 
-rot13code = '''
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Unit 2 Rot 13</title>
-  </head>
+    def render_str(self, template,**params):
+        t=jinja_env.get_template(template)
+        return t.render(params)
 
-  <body>
-    <h2>Enter some text to ROT13:</h2>
-    <form method="post">
-      <textarea name="text" style="height: 100px; width: 400px;">%(input)s</textarea>
-      <br>
-      <input type="submit">
-    </form>
-  </body>
+class MainHandler(Handler):
+    def get(self):
+        self.render("home.html")
 
-</html>
-'''
-
-signupcode = '''
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Sign Up</title>
-    <style type="text/css">
-      .label {text-align: right}
-      .error {color: red}
-    </style>
-
-  </head>
-
-  <body>
-    <h2>Signup</h2>
-    <form method="post">
-      <table>
-        <tr>
-          <td class="label">
-            Username
-          </td>
-          <td>
-            <input type="text" name="username" value="%(username)s">
-          </td>
-          <td class="error">
-            %(username_error)s
-          </td>
-        </tr>
-
-        <tr>
-          <td class="label">
-            Password
-          </td>
-          <td>
-            <input type="password" name="password" value="%(password)s">
-          </td>
-          <td class="error">
-            %(password_error)s
-          </td>
-        </tr>
-
-        <tr>
-          <td class="label">
-            Verify Password
-          </td>
-          <td>
-            <input type="password" name="verify" value="%(verify)s">
-          </td>
-          <td class="error">
-            %(verify_error)s
-          </td>
-        </tr>
-
-        <tr>
-          <td class="label">
-            Email (optional)
-          </td>
-          <td>
-            <input type="text" name="email" value="%(email)s">
-          </td>
-          <td class="error">
-            %(email_error)s
-          </td>
-        </tr>
-      </table>
-
-      <input type="submit">
-    </form>
-  </body>
-
-</html>
-'''
-
-class MainHandler(webapp2.RequestHandler):
+class BirthdayHandler(Handler):
     def write_form(self, error="", month="", day="", year=""):
-        self.response.out.write(form %{"error": error,
-                                        "month": escape_html(month),
-                                        "day": escape_html(day),
-                                        "year": escape_html(year)})
+        self.render("birthday.html", error=error,
+                                     month=month,
+                                     day=day,
+                                     year=year)
 
     def get(self):
         self.write_form()
@@ -157,7 +64,9 @@ class MainHandler(webapp2.RequestHandler):
 
         if not (month and day and year):
             self.write_form("That doesn't look valid to me, friend.",
-                            user_month, user_day, user_year)
+                            escape_html(user_month), 
+                            escape_html(user_day), 
+                            escape_html(user_year))
         else:
             self.redirect('/thanks')
 
@@ -173,18 +82,18 @@ class Unit2Rot13Handler(webapp2.RequestHandler):
         translated_text = escape_html(self.request.get('text').encode('rot13'))
         self.response.out.write(rot13code %{'input': translated_text})
 
-class Unit2SignupHandler(webapp2.RequestHandler):
+class Unit2SignupHandler(Handler):
     def write_form(self, username="", password="", verify="", email="",
                    username_error="", password_error="", verify_error="", 
                    email_error=""):
-        self.response.out.write(signupcode %{'username': username,
-                                            'password': password,
-                                            'verify': verify,
-                                            'email': email,
-                                            'username_error': username_error,
-                                            'password_error': password_error,
-                                            'verify_error': verify_error,
-                                            'email_error': email_error})
+        self.render("signup.html", username=username, 
+                                   password=password, 
+                                   verify=verify, 
+                                   email=email, 
+                                   username_error=username_error, 
+                                   password_error=password_error, 
+                                   verify_error=verify_error, 
+                                   email_error=email_error)
 
     def get(self):
         self.write_form()
@@ -215,10 +124,12 @@ class WelcomeHandler(webapp2.RequestHandler):
 
 
 app = webapp2.WSGIApplication([('/', MainHandler),
+                               ('/birthday', BirthdayHandler),
                                ('/thanks', ThanksHandler),
                                ('/unit2/rot13', Unit2Rot13Handler), 
                                ('/unit2/signup', Unit2SignupHandler),
-                               ('/unit2/welcome', WelcomeHandler)], 
+                               ('/unit2/welcome', WelcomeHandler),
+                               ('/blog', blog.MainPage)], 
                                debug=True)
 
 def escape_html(s):
