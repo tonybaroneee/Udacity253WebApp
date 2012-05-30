@@ -16,18 +16,20 @@
 #
 import webapp2
 import string
-import re
 import os
-import blog
 import jinja2
 
+import blog
+import helpers
+
+# Declare Jinja directory and environment
 template_dir=os.path.join(os.path.dirname(__file__),'templates')
 jinja_env=jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir),autoescape=True)
 
-USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
-PASSWORD_RE = re.compile(r"^.{3,20}$")
-EMAIL_RE = re.compile(r"^[\S]+@[\S]+\.[\S]+$")
-
+#
+# Superclass Handler that provides helper methods for shorthand response writes
+# and Jinja template writes.
+#
 class Handler(webapp2.RequestHandler):
     def write(self,*a,**kw):
         self.response.out.write(*a,**kw)
@@ -39,10 +41,16 @@ class Handler(webapp2.RequestHandler):
         t=jinja_env.get_template(template)
         return t.render(params)
 
+#
+# Homepage Handler for displaying links to various modules 
+#
 class MainHandler(Handler):
     def get(self):
         self.render("home.html")
 
+#
+# Birthday Handler for handling date validation module 
+#
 class BirthdayHandler(Handler):
     def write_form(self, error="", month="", day="", year=""):
         self.render("birthday.html", error=error,
@@ -58,31 +66,43 @@ class BirthdayHandler(Handler):
         user_day = self.request.get('day')
         user_year = self.request.get('year')
 
-        month = valid_month(self.request.get('month'))
-        day = valid_day(self.request.get('day'))
-        year = valid_year(self.request.get('year'))
+        month = helpers.valid_month(self.request.get('month'))
+        day = helpers.valid_day(self.request.get('day'))
+        year = helpers.valid_year(self.request.get('year'))
 
         if not (month and day and year):
             self.write_form("That doesn't look valid to me, friend.",
-                            escape_html(user_month), 
-                            escape_html(user_day), 
-                            escape_html(user_year))
+                            user_month, 
+                            user_day, 
+                            user_year)
         else:
             self.redirect('/thanks')
 
+#
+# Thanks Handler for handling acceptable inputted date from date validation module 
+#
 class ThanksHandler(webapp2.RequestHandler):
     def get(self):
         self.response.out.write("Thanks! That's a totally valid day!")
 
-class Unit2Rot13Handler(webapp2.RequestHandler):
+#
+# Rot13 Handler for handling Rot13 encoding/decoding for a block of text
+#
+class Rot13Handler(Handler):
+    def write_form(self, input=""):
+        self.render("rot13.html", input=input)
+
     def get(self):
-        self.response.out.write(rot13code %{'input': ''})
+        self.write_form()
 
     def post(self):
-        translated_text = escape_html(self.request.get('text').encode('rot13'))
-        self.response.out.write(rot13code %{'input': translated_text})
+        translated_text = self.request.get('text').encode('rot13')
+        self.write_form(translated_text)
 
-class Unit2SignupHandler(Handler):
+#
+# Signup Handler for handling user signup validation module 
+#
+class SignupHandler(Handler):
     def write_form(self, username="", password="", verify="", email="",
                    username_error="", password_error="", verify_error="", 
                    email_error=""):
@@ -104,101 +124,35 @@ class Unit2SignupHandler(Handler):
         user_verify = self.request.get('verify')
         user_email = self.request.get('email')
         
-        username_error = check_username(user_username)
-        password_error = check_password(user_password)
+        username_error = helpers.check_username(user_username)
+        password_error = helpers.check_password(user_password)
         verify_error = ''
         if not password_error:
-            verify_error = check_verify(user_verify, user_password)
-        email_error = check_email(user_email)
+            verify_error = helpers.check_verify(user_verify, user_password)
+        email_error = helpers.check_email(user_email)
 
         if (username_error or password_error or verify_error or email_error):
-            self.write_form(escape_html(user_username), '', '',
-                escape_html(user_email), username_error, password_error, verify_error, 
+            self.write_form(user_username, '', '',
+                user_email, username_error, password_error, verify_error, 
                 email_error)
         else:
-            self.redirect('/unit2/welcome?username=%s' % escape_html(user_username))
+            self.redirect('/unit2/welcome?username=%s' % user_username)
 
+#
+# Welcome Handler for handling acceptable user signup credentials 
+#
 class WelcomeHandler(webapp2.RequestHandler):
     def get(self):
         self.response.out.write("Welcome, %s!" % self.request.get('username'))
 
-
+#
+# URL routes to specific handlers 
+#
 app = webapp2.WSGIApplication([('/', MainHandler),
                                ('/birthday', BirthdayHandler),
                                ('/thanks', ThanksHandler),
-                               ('/unit2/rot13', Unit2Rot13Handler), 
-                               ('/unit2/signup', Unit2SignupHandler),
-                               ('/unit2/welcome', WelcomeHandler),
+                               ('/rot13', Rot13Handler), 
+                               ('/signup', SignupHandler),
+                               ('/welcome', WelcomeHandler),
                                ('/blog', blog.MainPage)], 
                                debug=True)
-
-def escape_html(s):
-    for (i, o) in (("&", "&amp;"),
-                   (">", "&gt;"),
-                   ("<", "&lt;"),
-                   ('"', "&quote;")):
-      s = s.replace(i, o)
-    return s
-
-months = ['January', 
-          'February',
-          'March',
-          'April',
-          'May',
-          'June',
-          'July',
-          'August',
-          'September',
-          'October',
-          'November',
-          'December']
-
-month_abbvs = dict((m[:3].lower(), m) for m in months)
-
-def valid_month(month):
-    if month:
-        short_month = month[:3].lower()
-        return month_abbvs.get(short_month)
-
-def valid_day(day):
-    if day and day.isdigit():
-        day = int(day)
-        if day in range(1,32):
-            return day
-
-def valid_year(year):
-    if year and year.isdigit():
-        year = int(year)
-        if year in range(1900,2021):
-            return year
-
-def check_username(name):
-    error_msg = "That's not a valid username."
-    if not (USER_RE.match(name)):
-        return error_msg
-    else:
-        return ''
-
-def check_password(password):
-    error_msg = "That's not a valid password."
-    if not (PASSWORD_RE.match(password)):
-        return error_msg
-    else:
-        return ''
-
-def check_verify(verify, password):
-    error_msg = "Your passwords didn't match."
-    if verify == password:
-        return ''
-    else:
-        return error_msg
-
-def check_email(email):
-    error_msg = "That's not a valid email."
-    if not email:
-        return '' # Because it's optional
-    else:
-        if not (EMAIL_RE.match(email)):
-            return error_msg
-        else:
-            return ''
