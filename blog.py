@@ -1,8 +1,11 @@
 import os
+from string import letters
+
 import webapp2
 import jinja2
-from webapp2_extras.routes import RedirectRoute
+import logging
 from google.appengine.ext import db
+from webapp2_extras.routes import RedirectRoute
 
 template_dir=os.path.join(os.path.dirname(__file__),'templates')
 jinja_env=jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir),autoescape=True)
@@ -16,8 +19,7 @@ class Handler(webapp2.RequestHandler):
         self.response.out.write(*a,**kw)
 
     def render_str(self, template,**params):
-        t=jinja_env.get_template(template)
-        return t.render(params)
+        return render_str(template, **params)
 
     def render(self,template,**kw):
          self.write(self.render_str(template,**kw))
@@ -37,15 +39,17 @@ class Post(db.Model):
 
 class BlogHome(Handler):
     def get(self):
-        posts = db.GqlQuery("select * from Post order by created desc limit 10")
+        #posts = db.GqlQuery("select * from Post order by created desc limit 10")
+        posts = db.GqlQuery("SELECT * "
+                            "FROM Post "
+                            "WHERE ANCESTOR IS :1 "
+                            "ORDER BY created DESC LIMIT 10",
+                            blog_key())
         self.render("blog/home.html", posts=posts)
 
 class BlogNewPost(Handler):
-    def render_newpost(self,subject="",content="",error=""):
-        self.render("blog/newpost.html",subject=subject,content=content,error=error)
-
     def get(self):
-        self.render_newpost()
+        self.render("blog/newpost.html")
 
     def post(self):
         subject = self.request.get('subject')
@@ -55,12 +59,12 @@ class BlogNewPost(Handler):
             p = Post(parent = blog_key(), subject = subject, content = content)
             p.put()
 
-            self.redirect('/blog/%s/' % str(p.key().id()))
+            self.redirect('/blog/%s' % str(p.key().id()))
         else:
             error="subject and content, please!"
-            self.render_newpost(subject,content,error)
+            self.render("blog/newpost.html",subject=subject,content=content,error=error)
 
-class Post(Handler):
+class BlogPermalink(Handler):
     def get(self, post_id):
         key = db.Key.from_path('Post', int(post_id), parent=blog_key())
         post = db.get(key)
@@ -71,7 +75,8 @@ class Post(Handler):
 
         self.render("blog/permalink.html", post = post)
 
-app = webapp2.WSGIApplication([RedirectRoute('/blog/', handler=BlogHome, name='blog_home', strict_slash=True),
-                               RedirectRoute('/blog/newpost/', handler=BlogNewPost, name='blog_newpost', strict_slash=True),
-                               RedirectRoute('/blog/([0-9]+)/', handler=Post, name='blog_post', strict_slash=True)],
+app = webapp2.WSGIApplication([('/blog/?', BlogHome),
+                               ('/blog/([0-9]+)', BlogPermalink),
+                               ('/blog/newpost', BlogNewPost),
+                               ],
                                debug=True)
