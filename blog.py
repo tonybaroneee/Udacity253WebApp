@@ -34,7 +34,6 @@ class Post(db.Model):
     last_modified = db.DateTimeProperty(auto_now=True)
 
     def render(self):
-        self._render_text = self.content.replace('\n', '<br>')
         return render_str("blog/post.html", p = self)
 
 class BlogHome(Handler):
