@@ -3,6 +3,7 @@ from string import letters
 
 import webapp2
 import jinja2
+import json
 
 import logging
 import helpers
@@ -27,6 +28,11 @@ class BlogHandler(webapp2.RequestHandler):
     def render(self,template,**kw):
          self.write(self.render_str(template,**kw))
 
+    def render_json(self, d):
+        json_txt = json.dumps(d)
+        self.response.headers['Content-Type'] = 'application/json; charset=UTF-8'
+        self.write(json_txt)
+
     def set_secure_cookie(self, name, val):
         cookie_val = helpers.make_secure_val(val)
         self.response.set_cookie('user_id', cookie_val, path='/')
@@ -45,6 +51,11 @@ class BlogHandler(webapp2.RequestHandler):
         webapp2.RequestHandler.initialize(self, *a, **kw)
         uid = self.read_secure_cookie('user_id')
         self.user = uid and User.by_id(int(uid))
+
+        if self.request.url.endswith('.json'):
+            self.format = 'json'
+        else:
+            self.format = 'html'
 
 def blog_key(name = 'default'):
     return db.Key.from_path('blogs', name)
@@ -89,6 +100,14 @@ class Post(db.Model):
     def render(self):
         return render_str("blog/post.html", p = self)
 
+    def as_dict(self):
+        time_fmt = '%c'
+        d = {'subject': self.subject,
+             'content': self.content,
+             'created': self.created.strftime(time_fmt),
+             'last_modified': self.last_modified.strftime(time_fmt)}
+        return d
+
 class BlogHome(BlogHandler):
     def get(self):
         #posts = db.GqlQuery("select * from Post order by created desc limit 10")
@@ -97,7 +116,10 @@ class BlogHome(BlogHandler):
                             "WHERE ANCESTOR IS :1 "
                             "ORDER BY created DESC LIMIT 10",
                             blog_key())
-        self.render("blog/home.html", posts=posts)
+        if self.format == 'html':
+            self.render("blog/home.html", posts=posts)
+        else:
+            return self.render_json([p.as_dict() for p in posts])
 
 #
 # Signup Handler for handling user signup validation module 
@@ -216,11 +238,13 @@ class BlogPermalink(BlogHandler):
         if not post:
             self.error(404)
             return
+        if self.format == 'html':
+            self.render("blog/permalink.html", post=post)
+        else:
+            self.render_json(post.as_dict())
 
-        self.render("blog/permalink.html", post = post)
-
-app = webapp2.WSGIApplication([('/blog/?', BlogHome),
-                               ('/blog/([0-9]+)', BlogPermalink),
+app = webapp2.WSGIApplication([('/blog/?(?:\.json)?', BlogHome),
+                               ('/blog/([0-9]+)(?:\.json)?', BlogPermalink),
                                ('/blog/newpost', BlogNewPost),
                                ('/blog/signup', BlogSignup),
                                ('/blog/login', BlogLogin),
