@@ -1,5 +1,8 @@
-import string
+from string import letters
 import re
+import hashlib
+import hmac
+import random
 
 #### VARS ####
 
@@ -24,8 +27,33 @@ months = ['January',
 # 3-letter abbreviations for all months
 month_abbvs = dict((m[:3].lower(), m) for m in months)
 
+# Secret key for hmac algo
+secretKey = "1234567890"
 
 #### FUNCTIONS ####
+
+# Secure hashing functions for cookie generation and parsing
+def make_secure_val(val):
+    return "%s|%s" %(val, hmac.new(secretKey, val).hexdigest())
+
+def check_secure_val(secure_val):
+    val = secure_val.split('|')[0]
+    if secure_val == make_secure_val(val):
+        return val
+
+# Secure password storage
+def make_salt(length = 5):
+    return ''.join(random.choice(letters) for x in xrange(length))
+
+def make_pw_hash(name, pw, salt = None):
+    if not salt:
+        salt = make_salt()
+    h = hashlib.sha256(name + pw + salt).hexdigest()
+    return '%s,%s' % (salt, h)
+
+def valid_pw(name, password, h):
+    salt = h.split(',')[0]
+    return h == make_pw_hash(name, password, salt)
 
 # Validate date components
 def valid_month(month):
